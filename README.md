@@ -9,7 +9,7 @@ Includes an exact‑title summary tool and optional Text‑to‑Speech (TTS) wit
 
 ## ✨ Features (assignment mapping)
 
-- **Books dataset (10+ titles)** in `books_prompt_result.json`.
+- **Books dataset (10 titles)** in `books_prompt_result.json`.
 - **Vector store** with **ChromaDB**.
 - **Embeddings via Ollama** (`nomic-embed-text`) – no OpenAI dependency.
 - **Chat endpoint** that:
