@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Book Assistant</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='endava_symbol_RGB.png') }}?v=4" />
+
+  <!-- Preload font (remove woff2 line if you only have .ttf) -->
+  <link rel="preload"
+        href="{{ url_for('static', filename='fonts/DavaSans-Regular.woff2') }}"
+        as="font" type="font/woff2" crossorigin>
+
+  <style>
+    /* Dava Sans registration (fallback to .ttf) */
+    @font-face {
+      font-family: "Dava Sans";
+      src: url("{{ url_for('static', filename='fonts/DavaSans-Regular.woff2') }}") format("woff2"),
+           url("{{ url_for('static', filename='fonts/DavaSans-Regular.ttf') }}") format("truetype");
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    :root {
+      --bg: #192B37;
+      --card: #FFFFFF;
+      --ink: #111;
+      --muted: #D1D5D7;
+      --accent: #FF5640;   /* Endava orange */
+      --radius: 12px;
+    }
+
+    body { font-family: "Dava Sans", Arial, sans-serif; background: var(--bg); margin:0; padding:0; }
+    #chat { width: 70%; margin: 2rem auto; background: var(--card); border-radius: var(--radius); padding:1rem;
+            box-shadow:0 1px 3px rgba(0,0,0,0.1); }
+    h2 { text-align:center; margin:0 0 12px; color: var(--ink);
+         display:flex; align-items:center; justify-content:center; gap:10px; }
+    h2 img { height:24px; width:auto; display:block; }
+
+    .messages { max-height: 500px; overflow-y:auto; border:1px solid var(--card);
+                border-radius:var(--radius); padding:8px; background:var(--card); }
+    .msg { max-width:80%; margin:10px 0; padding:10px 12px; border-radius:12px; white-space: pre-wrap; }
+    .user { background: var(--accent); color:#fff; margin-left:auto; text-align:right; }
+    .bot  { background: var(--muted); color: var(--ink); margin-right:auto; }
+
+    .meta { display:flex; gap:8px; margin-top:6px; }
+    .meta button { border:none; border-radius:8px; padding:6px 12px; cursor:pointer; background:#f1f3f5;
+                   display:flex; align-items:center; font-size:14px; color: var(--ink); }
+    .btn-icon svg { width:18px; height:18px; margin-right:6px; vertical-align:-3px; }
+
+    .play-btn { background: var(--primary); color:#FFFFFF; }
+    .play-btn:hover { background:#FF5640; }
+    .download-btn { background: var(--accent); color:#FFFFFF; }
+    .download-btn:hover { background:#FF5640; }
+
+    .input-row { display:flex; margin-top:12px; gap:8px; }
+    input[type="text"] { flex:1; padding:10px; border-radius:8px; border:1px solid #ccc; font-size:15px; }
+    button.send { padding:10px 16px; border:none; border-radius:8px; background: var(--accent); color:#FFFFFF; cursor:pointer; }
+
+    .controls { display:flex; gap:10px; align-items:center; margin-top:10px; color:#666; font-size:14px; flex-wrap:wrap; }
+    .controls input { width:80px; }
+    audio { margin-top: 6px; width: 100%; }
+    /* Footer sticky jos */
+    html, body { height: 100%; }
+    .page { min-height: 100vh; display: flex; flex-direction: column; }
+    #chat { flex: 1 0 auto; }
+
+    footer.footer { background:#192B37; border-top:1px solid rgba(255,255,255,.06); }
+    .footer-inner { width:70%; margin:0 auto; padding:20px 0 28px;
+                    display:flex; align-items:center; gap:16px; 
+                    justify-content:center;  }
+    .footer-logo { height:36px; width:auto; display:block; }
+    .footer-copy { color:#C8D0D6; font-size:20px; line-height:1; }
+
+    @media (max-width:960px){
+      .footer-inner, #chat { width:92%; }
+      .footer-logo { height:28px; }
+      .footer-copy { font-size:16px; }
+    }
+
+  </style>
+</head>
+<body>
+  <div id="chat">
+    <h2>
+      <img src="{{ url_for('static', filename='endava_symbol_RGB.png') }}" alt="logo">
+      Book Assistant
+    </h2>
+
+    <div id="messages" class="messages"></div>
+
+    <div class="input-row">
+      <input id="msgInput" type="text" placeholder="Ask about a book, theme, vibe…" />
+      <button class="send" onclick="sendMsg()">Send</button>
+    </div>
+
+    <div class="controls">
+      <span> Rate</span><input id="rate" type="number" value="175" min="80" max="240" />
+      <span> Volume</span><input id="vol" type="number" value="1.0" step="0.1" min="0" max="1" />
+      <audio id="player" controls hidden></audio>
+    </div>
+  </div>
+
+  <script>
+    const messagesEl = document.getElementById("messages");
+    const inputEl = document.getElementById("msgInput");
+    const rateEl = document.getElementById("rate");
+    const volEl  = document.getElementById("vol");
+    const player = document.getElementById("player");
+
+    // SVG icons
+    const PLAY_SVG = `
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M11 5l-4 4H4v6h3l4 4V5z"></path>
+        <path d="M15.5 8.5a5 5 0 0 1 0 7"></path>
+        <path d="M18.5 6.5a8 8 0 0 1 0 11"></path>
+      </svg>`;
+    const DOWNLOAD_SVG = `
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <path d="M7 10l5 5 5-5"></path>
+        <path d="M12 15V3"></path>
+      </svg>`;
+
+    async function sendMsg() {
+      const text = inputEl.value.trim();
+      if (!text) return;
+      addMessage("user", text);
+      inputEl.value = "";
+
+      try {
+        const res = await fetch("/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: text })
+        });
+        const data = await res.json();
+        addMessage("bot", data.reply || "(empty reply)");
+      } catch (e) {
+        addMessage("bot", "Error: " + e.message);
+      }
+    }
+
+    function addMessage(role, text) {
+      const wrap = document.createElement("div");
+      wrap.className = "msg " + role;
+
+      const content = document.createElement("div");
+      content.textContent = text;
+      wrap.appendChild(content);
+
+      if (role === "bot") {
+        const meta = document.createElement("div");
+        meta.className = "meta";
+
+        const playBtn = document.createElement("button");
+        playBtn.className = "btn-icon play-btn";
+        playBtn.innerHTML = `${PLAY_SVG} Play`;
+        playBtn.onclick = () => ttsPlay(text);
+
+        const dlBtn = document.createElement("button");
+        dlBtn.className = "btn-icon download-btn";
+        dlBtn.innerHTML = `${DOWNLOAD_SVG} Download`;
+        dlBtn.onclick = () => ttsDownload(text, "summary.wav");
+
+        meta.appendChild(playBtn);
+        meta.appendChild(dlBtn);
+        wrap.appendChild(meta);
+      }
+
+      messagesEl.appendChild(wrap);
+      wrap.scrollIntoView();
+    }
+
+    async function ttsBlob(text, rate=175, volume=1.0) {
+      const res = await fetch("/tts", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ text, rate: Number(rate), volume: Number(volume) })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      return await res.blob();
+    }
+
+    async function ttsPlay(text) {
+      if (!text) return;
+      try {
+        const blob = await ttsBlob(text, rateEl.value, volEl.value);
+        const url = URL.createObjectURL(blob);
+        player.src = url;
+        player.hidden = false;
+        await player.play().catch(()=>{});
+      } catch (e) {
+        addMessage("bot", "TTS error: " + e.message);
+      }
+    }
+
+    async function ttsDownload(text, filename) {
+      if (!text) return;
+      try {
+        const blob = await ttsBlob(text, rateEl.value, volEl.value);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename || "summary.wav";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(()=> URL.revokeObjectURL(url), 2000);
+      } catch (e) {
+        addMessage("bot", "TTS error: " + e.message);
+      }
+    }
+
+    inputEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") sendMsg();
+    });
+  </script>
+    <footer class="footer">
+      <div class="footer-inner">
+        <img class="footer-logo"
+             src="{{ url_for('static', filename='endava_logo_neg_RGB.png') }}"
+             alt="Endava logo">
+        
+        <div class="footer-copy">© Endava, all rights reserved.</div>
+      </div>
+      
+    </footer>
+</body>
+</html>
