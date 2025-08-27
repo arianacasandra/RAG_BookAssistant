@@ -3,7 +3,7 @@
 Local book‑recommender chatbot that uses **ChromaDB** for semantic search, **Ollama** for embeddings, a simple **Flask** backend, and a lightweight web UI.  
 Includes an exact‑title summary tool and optional Text‑to‑Speech (TTS) with **Play** and **Download** in the UI.
 
-> This project implements the assignment using a fully local stack (no OpenAI embeddings).
+
 ![Book Assistant UI](static/screenshot.png)
 
 
