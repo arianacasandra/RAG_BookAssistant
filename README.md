@@ -32,7 +32,8 @@ project/
 │  ├─ endava_symbol_RGB.png
 │  ├─ endava_logo_pos_RGB.png (or _neg_)
 │  ├─ send.svg, audio.svg   (optional)
-├─ books_prompt_result.json # 10+ books with titles & summaries
+├─ books_prompt_result.json # 10 books with titles & summaries
+├─ book_summaries.py        # helper script for producing a structured JSON dataset of 10 book summaries
 ├─ bad_words.json           # curated list used by the polite language filter
 |─ snippets/
 |  ├─ ollama.py             # (optional) CLI demo for embeddings/TTS (openAI key didn't work)
